@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Website Pricing Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3a;
+    --accent: #f0c040;
+    --accent2: #e07040;
+    --green: #40c070;
+    --red: #e04060;
+    --blue: #4090e0;
+    --purple: #9060e0;
+    --text: #f0f0f8;
+    --muted: #7070a0;
+    --font: 'Syne', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    padding: 24px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* PAGE SYSTEM */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .header {
+    text-align: center;
+    margin-bottom: 36px;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle at center, rgba(240,192,64,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .header h1 { font-size: 32px; font-weight: 800; color: var(--accent); letter-spacing: -1px; margin-bottom: 8px; }
+  .header p { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-family: var(--mono); margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .pages-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .addons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .recurring-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+
+  .page-item, .addon-item, .recurring-item {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .page-item:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .page-item.selected { border-color: var(--accent); background: rgba(240,192,64,0.08); }
+  .page-item.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  .addon-item:hover { border-color: var(--blue); transform: translateY(-1px); }
+  .addon-item.selected { border-color: var(--blue); background: rgba(64,144,224,0.08); }
+  .addon-item.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  .recurring-item:hover { border-color: var(--purple); transform: translateY(-1px); }
+  .recurring-item.selected { border-color: var(--purple); background: rgba(144,96,224,0.08); }
+
+  .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .page-name { font-size: 13px; font-weight: 700; }
+  .page-price { font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 600; }
+  .addon-price { font-family: var(--mono); font-size: 11px; color: var(--blue); font-weight: 600; }
+  .recurring-price { font-family: var(--mono); font-size: 11px; color: var(--purple); font-weight: 600; }
+  .page-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  .checkmark, .addon-check, .recurring-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: none; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; flex-shrink: 0;
+  }
+  .checkmark { background: var(--accent); color: #000; }
+  .addon-check { background: var(--blue); color: #000; }
+  .recurring-check { background: var(--purple); color: #fff; }
+  .page-item.selected .checkmark { display: flex; }
+  .addon-item.selected .addon-check { display: flex; }
+  .recurring-item.selected .recurring-check { display: flex; }
+
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 9px; font-family: var(--mono); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.3px; margin-left: 6px; vertical-align: middle;
+  }
+  .tag-required { background: rgba(224,64,96,0.2); color: var(--red); }
+  .tag-popular { background: rgba(240,192,64,0.2); color: var(--accent); }
+  .tag-recommended { background: rgba(64,192,112,0.2); color: var(--green); }
+
+  /* BOTTOM BAR */
+  .bottom-bar {
+    display: flex; gap: 12px;
+    margin-top: 8px; margin-bottom: 40px;
+    position: sticky; bottom: 20px;
+  }
+  .btn-view-quote {
+    flex: 1; padding: 16px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: 14px;
+    font-family: var(--font); font-weight: 800; font-size: 15px;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.3px;
+    box-shadow: 0 4px 24px rgba(240,192,64,0.25);
+  }
+  .btn-view-quote:hover { background: #ffd060; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(240,192,64,0.35); }
+  .btn-reset-bar {
+    padding: 16px 24px;
+    background: var(--surface); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 14px;
+    font-family: var(--font); font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-reset-bar:hover { border-color: var(--red); color: var(--red); }
+
+  /* QUOTE PAGE */
+  .quote-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 28px;
+  }
+  .btn-back {
+    padding: 10px 20px;
+    background: var(--surface); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-family: var(--font); font-weight: 700; font-size: 13px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+  .quote-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  .quote-card h2 {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-family: var(--mono); margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .quote-card h2::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .quote-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .quote-line:last-child { border-bottom: none; }
+  .quote-line .ql-label { color: var(--text); }
+  .quote-line .ql-price { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+  .quote-line.free .ql-price { color: var(--green); }
+
+  .quote-divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  .quote-total {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 0;
+  }
+  .qt-label { font-size: 12px; font-weight: 700; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+  .qt-amount { font-size: 36px; font-weight: 800; color: var(--accent); font-family: var(--mono); }
+  .qt-amount.monthly { font-size: 26px; color: var(--purple); }
+  .qt-amount.yearly { font-size: 26px; color: var(--blue); }
+
+  .advance-note {
+    background: rgba(240,192,64,0.08);
+    border: 1px solid rgba(240,192,64,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .advance-note strong { color: var(--accent); }
+
+  .btn-copy-quote {
+    width: 100%; padding: 16px;
+    background: var(--accent); color: #000;
+    border: none; border-radius: 14px;
+    font-family: var(--font); font-weight: 800; font-size: 15px;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 4px 24px rgba(240,192,64,0.25);
+    margin-bottom: 12px;
+  }
+  .btn-copy-quote:hover { background: #ffd060; transform: translateY(-2px); }
+
+  .copied-toast {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--green); color: #000;
+    padding: 12px 20px 12px 24px;
+    border-radius: 100px; font-weight: 700; font-size: 13px;
+    transition: transform 0.3s ease; z-index: 999;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .copied-toast.show { transform: translateX(-50%) translateY(0); }
+  .toast-close {
+    background: rgba(0,0,0,0.15); border: none; color: #000;
+    font-weight: 800; font-size: 13px; cursor: pointer;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .toast-close:hover { background: rgba(0,0,0,0.25); }
+
+  .empty-quote {
+    text-align: center; padding: 40px 20px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+  }
+
+  @media (max-width: 600px) {
+    .pages-grid, .addons-grid, .recurring-grid { grid-template-columns: 1fr 1fr; }
+    .qt-amount { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: CALCULATOR -->
+<div class="page active" id="pageCalc">
+  <div class="header">
+    <h1>💻 Website Pricing Builder</h1>
+    <p>Select pages and services — then view your quote</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📄 Pages</div>
+    <div class="pages-grid" id="pagesGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">⚡ Features & Add-Ons</div>
+    <div class="addons-grid" id="addonsGrid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔁 Monthly & Annual Services</div>
+    <div class="recurring-grid" id="recurringGrid"></div>
+  </div>
+
+  <div class="bottom-bar">
+    <button class="btn-view-quote" onclick="openQuotePage()">📊 View Quote →</button>
+    <button class="btn-reset-bar" onclick="resetAll()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- PAGE 2: QUOTE -->
+<div class="page" id="pageQuote">
+  <div class="quote-header">
+    <button class="btn-back" onclick="goBack()">← Back</button>
+    <div>
+      <div style="font-size:22px;font-weight:800;color:var(--accent);">Your Quote</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono);">Custom pricing breakdown</div>
+    </div>
+  </div>
+
+  <div id="quoteContent"></div>
+
+  <div class="advance-note">
+    <strong>Payment Terms:</strong> 50% advance before work starts · 50% on delivery<br>
+    <strong>Free demo</strong> before client commits to anything.
+  </div>
+
+  <button class="btn-copy-quote" onclick="copyQuote()">📋 Copy Quote for WhatsApp</button>
+</div>
+
+<div class="copied-toast" id="toast">✅ Copied to clipboard! <button class="toast-close" onclick="document.getElementById('toast').classList.remove('show')">✕</button></div>
+
+<script>
+const PAGES = [
+  { id: 'home', name: 'Home Page', price: 0, desc: 'Main landing page — always included', required: true },
+  { id: 'about', name: 'About Us', price: 2000, desc: 'Story, team, mission' },
+  { id: 'services', name: 'Services / Courses', price: 2000, desc: 'Services or courses with details', tag: 'popular' },
+  { id: 'gallery', name: 'Photo Gallery', price: 2000, desc: 'Portfolio, work samples, photos', tag: 'popular' },
+  { id: 'contact', name: 'Contact Page', price: 0, desc: 'Phone, address, map — always included', required: true },
+  { id: 'testimonials', name: 'Testimonials', price: 2000, desc: 'Reviews and success stories' },
+  { id: 'blog', name: 'Blog / Articles', price: 5000, desc: 'Content section for tips and news' },
+  { id: 'faq', name: 'FAQ Page', price: 1500, desc: 'Common questions answered' },
+  { id: 'team', name: 'Our Team', price: 1500, desc: 'Staff, doctor or instructor profiles' },
+  { id: 'pricing', name: 'Pricing / Packages', price: 2000, desc: 'Show your packages and fees' },
+  { id: 'booking', name: 'Booking / Enquiry', price: 3000, desc: 'Lead capture and appointment form', tag: 'recommended' },
+  { id: 'ecom', name: 'Online Store', price: 20000, desc: 'Sell products online — up to 50 products', tag: 'popular' },
+];
+
+const ADDONS = [
+  { id: 'whatsapp', name: 'WhatsApp Button', price: 0, desc: 'Floating WhatsApp button', tag: 'free' },
+  { id: 'maps', name: 'Google Maps Embed', price: 0, desc: 'Live location map on contact page', tag: 'free' },
+  { id: 'hosting', name: '1 Year Hosting + Domain', price: 5000, desc: 'Everything needed to go live', tag: 'recommended' },
+  { id: 'speed', name: 'Speed Optimisation', price: 5000, desc: 'Fast loading on mobile and desktop' },
+  { id: 'mobile', name: 'Mobile Optimisation', price: 3000, desc: 'Perfect on every screen size' },
+  { id: 'social', name: 'Social Media Integration', price: 1500, desc: 'Instagram, Facebook feed on site' },
+  { id: 'chatbot', name: 'AI Chatbot Setup', price: 10000, desc: '24/7 AI assistant trained on your business', tag: 'popular' },
+  { id: 'payment', name: 'Payment Gateway', price: 5000, desc: 'Accept payments via Razorpay' },
+  { id: 'multilang', name: 'Hindi + English', price: 5000, desc: 'Website in both languages' },
+  { id: 'logo', name: 'Logo Design', price: 3000, desc: "Professional logo if you don't have one" },
+];
+
+const RECURRING = [
+  { id: 'hosting_annual', name: 'Annual Maintenance', price: 8000, period: '/year', desc: 'Domain + hosting renewal' },
+  { id: 'care', name: 'Care Plan', price: 15000, period: '/year', desc: 'Hosting + 2 content updates/month' },
+  { id: 'seo_basic', name: 'Basic SEO', price: 8000, period: '/month', desc: 'Google ranking + monthly report', tag: 'popular' },
+  { id: 'seo_growth', name: 'Growth SEO', price: 15000, period: '/month', desc: 'Full SEO — content, backlinks, tracking' },
+  { id: 'chatbot_monthly', name: 'Chatbot Monthly', price: 6000, period: '/month', desc: 'AI chatbot hosting + maintenance' },
+  { id: 'social_mgmt', name: 'Social Media Management', price: 10000, period: '/month', desc: 'Posts, reels, engagement handling' },
+];
+
+let selectedPages = new Set(['home', 'contact']);
+let selectedAddons = new Set(['whatsapp', 'maps']);
+let selectedRecurring = new Set();
+
+function renderPages() {
+  document.getElementById('pagesGrid').innerHTML = PAGES.map(p => {
+    const sel = selectedPages.has(p.id);
+    const dis = p.required;
+    const tagHtml = p.required ? '<span class="tag tag-required">Included</span>' : p.tag === 'popular' ? '<span class="tag tag-popular">Popular</span>' : p.tag === 'recommended' ? '<span class="tag tag-recommended">Recommended</span>' : '';
+    return `<div class="page-item ${sel?'selected':''} ${dis?'disabled':''}" onclick="togglePage('${p.id}')">
+      <div class="page-header">
+        <span class="page-name">${p.name}${tagHtml}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="page-price">${p.price===0?'Free':'₹'+p.price.toLocaleString('en-IN')}</span>
+          <div class="checkmark">✓</div>
+        </div>
+      </div>
+      <div class="page-desc">${p.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAddons() {
+  document.getElementById('addonsGrid').innerHTML = ADDONS.map(a => {
+    const sel = selectedAddons.has(a.id);
+    const dis = a.price === 0;
+    const tagHtml = a.tag==='free'?'<span class="tag tag-required">Free</span>':a.tag==='popular'?'<span class="tag tag-popular">Popular</span>':a.tag==='recommended'?'<span class="tag tag-recommended">Recommended</span>':'';
+    return `<div class="addon-item ${sel?'selected':''} ${dis?'disabled':''}" onclick="toggleAddon('${a.id}')">
+      <div class="page-header">
+        <span class="page-name">${a.name}${tagHtml}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="addon-price">${a.price===0?'Free':'₹'+a.price.toLocaleString('en-IN')}</span>
+          <div class="addon-check">✓</div>
+        </div>
+      </div>
+      <div class="page-desc">${a.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRecurring() {
+  document.getElementById('recurringGrid').innerHTML = RECURRING.map(r => {
+    const sel = selectedRecurring.has(r.id);
+    const tagHtml = r.tag==='popular'?'<span class="tag tag-popular">Popular</span>':'';
+    return `<div class="recurring-item ${sel?'selected':''}" onclick="toggleRecurring('${r.id}')">
+      <div class="page-header">
+        <span class="page-name">${r.name}${tagHtml}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="recurring-price">₹${r.price.toLocaleString('en-IN')}${r.period}</span>
+          <div class="recurring-check">✓</div>
+        </div>
+      </div>
+      <div class="page-desc">${r.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function togglePage(id) {
+  const p = PAGES.find(x=>x.id===id);
+  if(p.required) return;
+  selectedPages.has(id)?selectedPages.delete(id):selectedPages.add(id);
+  renderPages();
+}
+
+function toggleAddon(id) {
+  const a = ADDONS.find(x=>x.id===id);
+  if(a.price===0) return;
+  selectedAddons.has(id)?selectedAddons.delete(id):selectedAddons.add(id);
+  renderAddons();
+}
+
+function toggleRecurring(id) {
+  selectedRecurring.has(id)?selectedRecurring.delete(id):selectedRecurring.add(id);
+  renderRecurring();
+}
+
+function buildQuoteData() {
+  const selPages = [...selectedPages].map(id=>PAGES.find(p=>p.id===id)).filter(Boolean);
+  const selAddons = [...selectedAddons].map(id=>ADDONS.find(a=>a.id===id)).filter(Boolean);
+  const selRecurring = [...selectedRecurring].map(id=>RECURRING.find(r=>r.id===id)).filter(Boolean);
+  const pageTotal = selPages.reduce((s,p)=>s+p.price,0);
+  const addonTotal = selAddons.reduce((s,a)=>s+a.price,0);
+  const baseSetup = 8000;
+  const oneTimeTotal = baseSetup + pageTotal + addonTotal;
+  const monthlyItems = selRecurring.filter(r=>r.period==='/month');
+  const yearlyItems = selRecurring.filter(r=>r.period==='/year');
+  const monthlyTotal = monthlyItems.reduce((s,r)=>s+r.price,0);
+  const yearlyTotal = yearlyItems.reduce((s,r)=>s+r.price,0);
+  return { selPages, selAddons, selRecurring, baseSetup, pageTotal, addonTotal, oneTimeTotal, monthlyItems, yearlyItems, monthlyTotal, yearlyTotal };
+}
+
+function openQuotePage() {
+  const d = buildQuoteData();
+  const nonFreePages = d.selPages.filter(p=>p.price>0);
+  const nonFreeAddons = d.selAddons.filter(a=>a.price>0);
+  const freeAddons = d.selAddons.filter(a=>a.price===0);
+
+  let html = '';
+
+  // One time card
+  html += `<div class="quote-card">
+    <h2>💰 One-Time Setup</h2>
+    <div class="quote-line"><span class="ql-label">Base Setup Fee</span><span class="ql-price">₹8,000</span></div>`;
+  
+  d.selPages.filter(p=>p.required).forEach(p => {
+    html += `<div class="quote-line free"><span class="ql-label">${p.name}</span><span class="ql-price">Free</span></div>`;
+  });
+  nonFreePages.forEach(p => {
+    html += `<div class="quote-line"><span class="ql-label">${p.name}</span><span class="ql-price">₹${p.price.toLocaleString('en-IN')}</span></div>`;
+  });
+  freeAddons.forEach(a => {
+    html += `<div class="quote-line free"><span class="ql-label">${a.name}</span><span class="ql-price">Free</span></div>`;
+  });
+  nonFreeAddons.forEach(a => {
+    html += `<div class="quote-line"><span class="ql-label">${a.name}</span><span class="ql-price">₹${a.price.toLocaleString('en-IN')}</span></div>`;
+  });
+
+  html += `<div class="quote-divider"></div>
+    <div class="quote-total">
+      <span class="qt-label">Total One-Time</span>
+      <span class="qt-amount">₹${d.oneTimeTotal.toLocaleString('en-IN')}</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);">
+      Advance: ₹${Math.ceil(d.oneTimeTotal/2).toLocaleString('en-IN')} · On delivery: ₹${Math.floor(d.oneTimeTotal/2).toLocaleString('en-IN')}
+    </div>
+  </div>`;
+
+  if(d.selRecurring.length > 0) {
+    html += `<div class="quote-card"><h2>🔁 Recurring Services</h2>`;
+    d.monthlyItems.forEach(r => {
+      html += `<div class="quote-line"><span class="ql-label">${r.name}</span><span class="ql-price">₹${r.price.toLocaleString('en-IN')}/mo</span></div>`;
+    });
+    d.yearlyItems.forEach(r => {
+      html += `<div class="quote-line"><span class="ql-label">${r.name}</span><span class="ql-price">₹${r.price.toLocaleString('en-IN')}/yr</span></div>`;
+    });
+    if(d.monthlyTotal > 0) {
+      html += `<div class="quote-divider"></div><div class="quote-total"><span class="qt-label">Monthly</span><span class="qt-amount monthly">₹${d.monthlyTotal.toLocaleString('en-IN')}/mo</span></div>`;
+    }
+    if(d.yearlyTotal > 0) {
+      html += `<div class="quote-divider"></div><div class="quote-total"><span class="qt-label">Annual</span><span class="qt-amount yearly">₹${d.yearlyTotal.toLocaleString('en-IN')}/yr</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  if(d.selPages.length === 0 && d.selAddons.length === 0) {
+    html = `<div class="empty-quote">Nothing selected yet. Go back and select some pages and features.</div>`;
+  }
+
+  document.getElementById('quoteContent').innerHTML = html;
+  document.getElementById('pageCalc').classList.remove('active');
+  document.getElementById('pageQuote').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function goBack() {
+  document.getElementById('pageQuote').classList.remove('active');
+  document.getElementById('pageCalc').classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function copyQuote() {
+  const d = buildQuoteData();
+  const nonFreePages = d.selPages.filter(p=>p.price>0);
+  const nonFreeAddons = d.selAddons.filter(a=>a.price>0);
+
+  let msg = `Hey! Here's your custom website quote 👇\n\n`;
+  msg += `📄 *PAGES INCLUDED*\n`;
+  d.selPages.forEach(p => { msg += `✅ ${p.name}\n`; });
+
+  if(d.selAddons.length > 0) {
+    msg += `\n⚡ *FEATURES INCLUDED*\n`;
+    d.selAddons.forEach(a => { msg += `✅ ${a.name}${a.price===0?' (Free)':''}\n`; });
+  }
+
+  msg += `\n💰 *ONE-TIME INVESTMENT*\n`;
+  msg += `Base Setup: ₹8,000\n`;
+  nonFreePages.forEach(p => { msg += `${p.name}: ₹${p.price.toLocaleString('en-IN')}\n`; });
+  nonFreeAddons.forEach(a => { msg += `${a.name}: ₹${a.price.toLocaleString('en-IN')}\n`; });
+  msg += `━━━━━━━━━━━━━━\n`;
+  msg += `*TOTAL: ₹${d.oneTimeTotal.toLocaleString('en-IN')}*\n`;
+  msg += `(50% advance: ₹${Math.ceil(d.oneTimeTotal/2).toLocaleString('en-IN')})\n`;
+
+  if(d.selRecurring.length > 0) {
+    msg += `\n🔁 *MONTHLY / ANNUAL SERVICES*\n`;
+    d.monthlyItems.forEach(r => { msg += `${r.name}: ₹${r.price.toLocaleString('en-IN')}/month\n`; });
+    d.yearlyItems.forEach(r => { msg += `${r.name}: ₹${r.price.toLocaleString('en-IN')}/year\n`; });
+    if(d.monthlyTotal > 0) msg += `*Monthly Total: ₹${d.monthlyTotal.toLocaleString('en-IN')}/month*\n`;
+    if(d.yearlyTotal > 0) msg += `*Annual Total: ₹${d.yearlyTotal.toLocaleString('en-IN')}/year*\n`;
+  }
+
+  msg += `\n✨ Free demo before you commit anything.\n📞 Let's hop on a quick call to finalise!`;
+
+  navigator.clipboard.writeText(msg).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  });
+}
+
+function resetAll() {
+  selectedPages = new Set(['home','contact']);
+  selectedAddons = new Set(['whatsapp','maps']);
+  selectedRecurring = new Set();
+  renderPages(); renderAddons(); renderRecurring();
+}
+
+renderPages(); renderAddons(); renderRecurring();
+</script>
+</body>
+</html>
